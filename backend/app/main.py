@@ -15,18 +15,18 @@ from app.config import settings
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup: Initialize ML models
-    print("🚀 Starting DocVault AI...")
+    print("[*] Starting DocVault AI...")
     from app.ml.classifier import DocumentClassifier
     from app.ml.ner import EntityExtractor
 
     app.state.classifier = DocumentClassifier()
     app.state.entity_extractor = EntityExtractor()
-    print("✅ ML models loaded")
+    print("[+] ML models loaded")
 
     yield
 
     # Shutdown
-    print("👋 Shutting down DocVault AI...")
+    print("[*] Shutting down DocVault AI...")
 
 
 app = FastAPI(
