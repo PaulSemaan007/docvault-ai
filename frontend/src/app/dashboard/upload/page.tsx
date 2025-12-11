@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Upload,
   FileText,
@@ -30,7 +29,6 @@ interface UploadedFile {
 }
 
 export default function UploadPage() {
-  const router = useRouter()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [dragActive, setDragActive] = useState(false)
 
@@ -91,27 +89,39 @@ export default function UploadPage() {
     ))
 
     try {
-      // Simulate upload and processing
-      // In production, this would call the actual API
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Create FormData for multipart upload
+      const formData = new FormData()
+      formData.append('file', uploadedFile.file)
 
+      // Call real backend API for AI processing
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/documents/demo-upload`, {
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header - browser sets it with boundary for FormData
+      })
+
+      // Update to processing state
       setFiles(prev => prev.map(f =>
         f.id === uploadedFile.id ? { ...f, status: 'processing', progress: 60 } : f
       ))
 
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }))
+        throw new Error(errorData.detail || 'Upload failed')
+      }
 
-      // Mock processing result
-      const classifications = ['invoice', 'contract', 'report', 'letter', 'form']
-      const mockResult = {
-        classification: classifications[Math.floor(Math.random() * classifications.length)],
-        confidence: 0.85 + Math.random() * 0.14,
-        entities: [
-          { type: 'DATE', value: '2024-01-15' },
-          { type: 'MONEY', value: '$5,000.00' },
-          { type: 'ORGANIZATION', value: 'Acme Corp' },
-          { type: 'PERSON', value: 'John Smith' }
-        ].slice(0, Math.floor(Math.random() * 3) + 2)
+      // Parse the AI processing results
+      const data = await response.json()
+
+      // Map API response to UI format
+      const result = {
+        classification: data.classification,
+        confidence: data.confidence_score,
+        entities: data.entities.map((e: { type: string; value: string }) => ({
+          type: e.type,
+          value: e.value
+        }))
       }
 
       setFiles(prev => prev.map(f =>
@@ -119,16 +129,17 @@ export default function UploadPage() {
           ...f,
           status: 'complete',
           progress: 100,
-          result: mockResult
+          result
         } : f
       ))
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process document'
       setFiles(prev => prev.map(f =>
         f.id === uploadedFile.id ? {
           ...f,
           status: 'error',
-          error: 'Failed to process document'
+          error: errorMessage
         } : f
       ))
     }

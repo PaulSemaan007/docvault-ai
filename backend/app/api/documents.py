@@ -139,6 +139,81 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class DemoUploadResponse(BaseModel):
+    """Response model for demo upload endpoint."""
+    id: str
+    filename: str
+    file_size: int
+    mime_type: str
+    classification: str
+    confidence_score: float
+    entities: List[dict]
+    status: str
+
+
+@router.post("/demo-upload", response_model=DemoUploadResponse)
+async def demo_upload_document(
+    request: Request,
+    file: UploadFile = File(...)
+):
+    """
+    Demo upload endpoint - no authentication required.
+    Processes document with real AI but doesn't persist to database.
+    Perfect for showcasing the ML pipeline capabilities.
+    """
+    # Validate file
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    # Check file extension
+    allowed_extensions = [".pdf", ".png", ".jpg", ".jpeg", ".doc", ".docx", ".txt"]
+    file_ext = "." + file.filename.split(".")[-1].lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed. Supported: {', '.join(allowed_extensions)}"
+        )
+
+    try:
+        # Read file content
+        content = await file.read()
+        file_size = len(content)
+
+        # Check file size (10MB limit)
+        if file_size > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+
+        # Generate a temporary ID for demo
+        file_id = str(uuid.uuid4())
+
+        # Process document with real AI (classification, OCR, NER)
+        classifier = request.app.state.classifier
+        entity_extractor = request.app.state.entity_extractor
+
+        processed = await process_document(
+            document_id=file_id,
+            file_path=f"demo/{file_id}{file_ext}",
+            content=content,
+            mime_type=file.content_type or "application/octet-stream",
+            classifier=classifier,
+            entity_extractor=entity_extractor
+        )
+
+        return DemoUploadResponse(
+            id=file_id,
+            filename=file.filename,
+            file_size=file_size,
+            mime_type=file.content_type or "application/octet-stream",
+            classification=processed["classification"],
+            confidence_score=processed["confidence"],
+            entities=processed["entities"],
+            status="processed"
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
     page: int = 1,
