@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from app.security.jwt import get_current_user
 from app.services.search_service import SearchService
+from app.services.demo_store import search_documents as demo_search
 
 router = APIRouter()
 
@@ -120,3 +121,62 @@ async def suggest_queries(
     )
 
     return {"suggestions": suggestions}
+
+
+class DemoSearchResult(BaseModel):
+    """Search result for demo mode."""
+    id: str
+    filename: str
+    classification: str
+    confidence_score: float
+    snippet: str
+    entities: List[dict]
+    created_at: str
+
+
+class DemoSearchResponse(BaseModel):
+    """Response for demo search."""
+    results: List[DemoSearchResult]
+    total: int
+    query: str
+
+
+@router.get("/demo", response_model=DemoSearchResponse)
+async def demo_search_documents(
+    q: str = Query("", description="Search query (empty returns all)")
+):
+    """
+    Demo search endpoint - no authentication required.
+    Searches documents stored in memory during this session.
+    """
+    results = demo_search(q)
+
+    # Format results with snippets
+    formatted_results = []
+    for doc in results:
+        # Create snippet from extracted text
+        text = doc.get("extracted_text", "")
+        snippet = text[:200] + "..." if len(text) > 200 else text
+
+        # Highlight query in snippet if present
+        if q and q.lower() in snippet.lower():
+            # Simple highlight by finding position
+            idx = snippet.lower().find(q.lower())
+            if idx >= 0:
+                snippet = f"{snippet[:idx]}**{snippet[idx:idx+len(q)]}**{snippet[idx+len(q):]}"
+
+        formatted_results.append(DemoSearchResult(
+            id=doc["id"],
+            filename=doc["filename"],
+            classification=doc["classification"],
+            confidence_score=doc["confidence_score"],
+            snippet=snippet or f"Document classified as {doc['classification']}",
+            entities=doc.get("entities", []),
+            created_at=doc.get("created_at", "")
+        ))
+
+    return DemoSearchResponse(
+        results=formatted_results,
+        total=len(formatted_results),
+        query=q
+    )

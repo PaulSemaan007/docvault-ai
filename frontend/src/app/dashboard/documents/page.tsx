@@ -9,10 +9,7 @@ import {
   Download,
   Trash2,
   Eye,
-  MoreVertical,
   ChevronDown,
-  Calendar,
-  Tag,
   Clock,
   CheckCircle
 } from 'lucide-react'
@@ -42,91 +39,28 @@ export default function DocumentsPage() {
   }, [])
 
   const fetchDocuments = async () => {
-    // Mock data for demo
-    const mockDocuments: Document[] = [
-      {
-        id: '1',
-        filename: 'Q4_Financial_Report_2024.pdf',
-        classification: 'report',
-        confidence_score: 0.94,
-        file_size: 2456789,
-        mime_type: 'application/pdf',
-        status: 'processed',
-        tags: ['quarterly', 'finance'],
-        created_at: '2024-01-15T10:30:00Z',
-        entities: [
-          { type: 'DATE', value: '2024-01-15' },
-          { type: 'MONEY', value: '$1,250,000' },
-          { type: 'ORGANIZATION', value: 'Acme Corporation' }
-        ]
-      },
-      {
-        id: '2',
-        filename: 'Invoice_INV-2024-0042.pdf',
-        classification: 'invoice',
-        confidence_score: 0.97,
-        file_size: 156789,
-        mime_type: 'application/pdf',
-        status: 'processed',
-        tags: ['vendor', 'payable'],
-        created_at: '2024-01-14T15:20:00Z',
-        entities: [
-          { type: 'MONEY', value: '$5,250.00' },
-          { type: 'DATE', value: '2024-02-15' },
-          { type: 'REFERENCE_NUMBER', value: 'INV-2024-0042' }
-        ]
-      },
-      {
-        id: '3',
-        filename: 'Employment_Agreement_JSmith.docx',
-        classification: 'contract',
-        confidence_score: 0.91,
-        file_size: 89456,
-        mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        status: 'processed',
-        tags: ['hr', 'legal'],
-        created_at: '2024-01-13T09:15:00Z',
-        entities: [
-          { type: 'PERSON', value: 'John Smith' },
-          { type: 'DATE', value: '2024-01-01' },
-          { type: 'MONEY', value: '$85,000/year' }
-        ]
-      },
-      {
-        id: '4',
-        filename: 'Vendor_Service_Agreement.pdf',
-        classification: 'contract',
-        confidence_score: 0.89,
-        file_size: 345678,
-        mime_type: 'application/pdf',
-        status: 'processed',
-        tags: ['vendor', 'services'],
-        created_at: '2024-01-12T14:45:00Z',
-        entities: [
-          { type: 'ORGANIZATION', value: 'TechServices Inc' },
-          { type: 'DATE', value: '2024-12-31' },
-          { type: 'MONEY', value: '$24,000' }
-        ]
-      },
-      {
-        id: '5',
-        filename: 'Meeting_Notes_Jan10.txt',
-        classification: 'other',
-        confidence_score: 0.72,
-        file_size: 12345,
-        mime_type: 'text/plain',
-        status: 'processed',
-        tags: ['meeting', 'internal'],
-        created_at: '2024-01-10T16:30:00Z',
-        entities: [
-          { type: 'DATE', value: '2024-01-10' },
-          { type: 'PERSON', value: 'Sarah Johnson' }
-        ]
-      }
-    ]
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/documents/demo-list`)
 
-    setDocuments(mockDocuments)
-    setLoading(false)
+      if (response.ok) {
+        const data = await response.json()
+        // Map API response to frontend format
+        const docs = data.documents.map((doc: Document) => ({
+          ...doc,
+          tags: doc.tags || []
+        }))
+        setDocuments(docs)
+      } else {
+        console.error('Failed to fetch documents')
+        setDocuments([])
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error)
+      setDocuments([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filteredDocuments = documents.filter(doc => {
@@ -135,7 +69,7 @@ export default function DocumentsPage() {
     return matchesSearch && matchesFilter
   })
 
-  const classifications = [...new Set(documents.map(d => d.classification))]
+  const classifications = Array.from(new Set(documents.map(d => d.classification)))
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -293,7 +227,13 @@ export default function DocumentsPage() {
         {filteredDocuments.length === 0 && (
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-600">No documents found</p>
+            <p className="text-slate-600 mb-4">No documents found</p>
+            <Link
+              href="/dashboard/upload"
+              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Upload your first document to get started
+            </Link>
           </div>
         )}
       </div>

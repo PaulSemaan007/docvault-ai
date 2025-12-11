@@ -38,53 +38,52 @@ export default function SearchPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!query.trim()) return
 
     setLoading(true)
     setSearched(true)
 
-    // Simulate search delay
-    await new Promise(resolve => setTimeout(resolve, 800))
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const searchParams = new URLSearchParams({ q: query.trim() })
+      const response = await fetch(`${apiUrl}/api/search/demo?${searchParams}`)
 
-    // Mock search results
-    const mockResults: SearchResult[] = [
-      {
-        id: '1',
-        filename: 'Q4_Financial_Report_2024.pdf',
-        classification: 'report',
-        snippet: '...quarterly revenue increased by 15% compared to Q3, with total <mark>revenue</mark> reaching $1.25M...',
-        score: 0.95,
-        created_at: '2024-01-15T10:30:00Z',
-        entities: [{ type: 'MONEY', value: '$1,250,000' }]
-      },
-      {
-        id: '2',
-        filename: 'Invoice_INV-2024-0042.pdf',
-        classification: 'invoice',
-        snippet: '...payment terms: Net 30. Total amount due: $5,250.00. <mark>Invoice</mark> date: January 14, 2024...',
-        score: 0.87,
-        created_at: '2024-01-14T15:20:00Z',
-        entities: [{ type: 'MONEY', value: '$5,250.00' }]
-      },
-      {
-        id: '3',
-        filename: 'Vendor_Service_Agreement.pdf',
-        classification: 'contract',
-        snippet: '...services shall commence on the <mark>effective</mark> date and continue for a period of 12 months...',
-        score: 0.72,
-        created_at: '2024-01-12T14:45:00Z',
-        entities: [{ type: 'ORGANIZATION', value: 'TechServices Inc' }]
+      if (response.ok) {
+        const data = await response.json()
+        // Map API response to frontend format
+        let searchResults: SearchResult[] = data.results.map((r: {
+          id: string
+          filename: string
+          classification: string
+          snippet: string
+          confidence_score: number
+          created_at: string
+          entities: Array<{ type: string; value: string }>
+        }) => ({
+          id: r.id,
+          filename: r.filename,
+          classification: r.classification,
+          snippet: r.snippet,
+          score: r.confidence_score,
+          created_at: r.created_at,
+          entities: r.entities || []
+        }))
+
+        // Apply client-side filters
+        if (filters.classification) {
+          searchResults = searchResults.filter(r => r.classification === filters.classification)
+        }
+
+        setResults(searchResults)
+      } else {
+        console.error('Search failed')
+        setResults([])
       }
-    ]
-
-    // Filter results based on active filters
-    let filtered = mockResults
-    if (filters.classification) {
-      filtered = filtered.filter(r => r.classification === filters.classification)
+    } catch (error) {
+      console.error('Search error:', error)
+      setResults([])
+    } finally {
+      setLoading(false)
     }
-
-    setResults(filtered)
-    setLoading(false)
   }
 
   const clearFilters = () => {

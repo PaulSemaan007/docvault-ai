@@ -13,6 +13,7 @@ from app.security.jwt import get_current_user
 from app.security.audit import log_action
 from app.services.document_service import DocumentService
 from app.services.storage_service import StorageService
+from app.services.demo_store import add_document, get_all_documents, get_stats
 from app.ml.pipeline import process_document
 
 router = APIRouter()
@@ -199,6 +200,21 @@ async def demo_upload_document(
             entity_extractor=entity_extractor
         )
 
+        # Store in demo store for persistence across pages
+        doc_record = {
+            "id": file_id,
+            "filename": file.filename,
+            "file_size": file_size,
+            "mime_type": file.content_type or "application/octet-stream",
+            "classification": processed["classification"],
+            "confidence_score": processed["confidence"],
+            "entities": processed["entities"],
+            "extracted_text": processed.get("text", ""),
+            "status": "processed",
+            "tags": []
+        }
+        add_document(doc_record)
+
         return DemoUploadResponse(
             id=file_id,
             filename=file.filename,
@@ -212,6 +228,55 @@ async def demo_upload_document(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class DemoDocumentResponse(BaseModel):
+    """Response model for demo document list."""
+    id: str
+    filename: str
+    file_size: int
+    mime_type: str
+    classification: str
+    confidence_score: float
+    entities: List[dict]
+    status: str
+    created_at: str
+
+
+class DemoListResponse(BaseModel):
+    """Response for demo document list."""
+    documents: List[DemoDocumentResponse]
+    total: int
+
+
+class DemoStatsResponse(BaseModel):
+    """Response for demo statistics."""
+    total_documents: int
+    classifications: dict
+    recent_count: int
+
+
+@router.get("/demo-list", response_model=DemoListResponse)
+async def demo_list_documents():
+    """
+    List all demo documents - no authentication required.
+    Returns documents stored in memory during this session.
+    """
+    documents = get_all_documents()
+    return DemoListResponse(
+        documents=[DemoDocumentResponse(**doc) for doc in documents],
+        total=len(documents)
+    )
+
+
+@router.get("/demo-stats", response_model=DemoStatsResponse)
+async def demo_get_stats():
+    """
+    Get demo statistics - no authentication required.
+    Returns counts and classifications of uploaded documents.
+    """
+    stats = get_stats()
+    return DemoStatsResponse(**stats)
 
 
 @router.get("", response_model=DocumentListResponse)

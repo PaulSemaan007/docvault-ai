@@ -34,33 +34,46 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      const token = localStorage.getItem('token')
-      // In production, fetch from API
-      // For demo, use mock data
-      setStats({
-        totalDocuments: 47,
-        documentsToday: 5,
-        documentsThisWeek: 23,
-        storageUsed: 156.4
-      })
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-      setClassificationBreakdown({
-        invoice: 18,
-        contract: 12,
-        report: 9,
-        letter: 5,
-        other: 3
-      })
-
-      setRecentDocuments([
-        { id: '1', filename: 'Q4_Report_2024.pdf', classification: 'report', created_at: '2024-01-15T10:30:00Z', status: 'processed' },
-        { id: '2', filename: 'Invoice_12345.pdf', classification: 'invoice', created_at: '2024-01-15T09:15:00Z', status: 'processed' },
-        { id: '3', filename: 'Employment_Contract.docx', classification: 'contract', created_at: '2024-01-14T16:45:00Z', status: 'processed' },
-        { id: '4', filename: 'Meeting_Notes.txt', classification: 'other', created_at: '2024-01-14T14:20:00Z', status: 'processed' },
-        { id: '5', filename: 'Vendor_Agreement.pdf', classification: 'contract', created_at: '2024-01-14T11:00:00Z', status: 'processed' },
+      // Fetch stats and documents in parallel
+      const [statsRes, docsRes] = await Promise.all([
+        fetch(`${apiUrl}/api/documents/demo-stats`),
+        fetch(`${apiUrl}/api/documents/demo-list`)
       ])
+
+      if (statsRes.ok) {
+        const statsData = await statsRes.json()
+        setStats({
+          totalDocuments: statsData.total_documents,
+          documentsToday: statsData.recent_count,
+          documentsThisWeek: statsData.total_documents,
+          storageUsed: 0
+        })
+        setClassificationBreakdown(statsData.classifications || {})
+      }
+
+      if (docsRes.ok) {
+        const docsData = await docsRes.json()
+        // Get the 5 most recent documents
+        const recent = docsData.documents.slice(0, 5).map((doc: {
+          id: string
+          filename: string
+          classification: string
+          created_at: string
+          status: string
+        }) => ({
+          id: doc.id,
+          filename: doc.filename,
+          classification: doc.classification,
+          created_at: doc.created_at,
+          status: doc.status
+        }))
+        setRecentDocuments(recent)
+      }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
+      // Keep defaults on error
     }
   }
 
